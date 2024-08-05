@@ -1,7 +1,7 @@
 import argparse
 import os
 from datetime import datetime
-
+import spaces
 import gradio as gr
 import numpy as np
 import torch
@@ -126,7 +126,7 @@ automasker = AutoMasker(
     device='cuda', 
 )
 
-
+@spaces.GPU
 def submit_function(
     person_image,
     cloth_image,
