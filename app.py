@@ -1,5 +1,6 @@
 import argparse
 import os
+os.environ['CUDA_HOME'] = '/usr/local/cuda'
 from datetime import datetime
 import spaces
 import gradio as gr
