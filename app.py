@@ -125,7 +125,7 @@ pipeline = CatVTONPipeline(
 mask_processor = VaeImageProcessor(vae_scale_factor=8, do_normalize=False, do_binarize=True, do_convert_grayscale=True)
 automasker = AutoMaskerSeg(
     densepose_ckpt=os.path.join(repo_path, "DensePose"),
-    segformer_ckpt="/home/chongzheng_p23/data/Projects/CatVTON-main/Models/segformer_b3_clothes",
+    segformer_ckpt="mattmdjaga/segformer_b2_clothes",
     device='cuda', 
 )
 
