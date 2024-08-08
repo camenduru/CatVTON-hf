@@ -1,5 +1,7 @@
 import argparse
 import os
+os.environ['CUDA_HOME'] = '/usr/local/cuda'
+os.environ['PATH'] = os.environ['PATH'] + ':/usr/local/cuda/bin'
 from datetime import datetime
 
 import gradio as gr
