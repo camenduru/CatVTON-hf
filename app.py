@@ -12,7 +12,7 @@ from diffusers.image_processor import VaeImageProcessor
 from huggingface_hub import snapshot_download
 from PIL import Image
 
-from model.cloth_masker import AutoMasker, vis_mask
+from model.cloth_masker import AutoMaskerSeg, vis_mask
 from model.pipeline import CatVTONPipeline
 from utils import init_weight_dtype, resize_and_crop, resize_and_padding
 
@@ -123,9 +123,9 @@ pipeline = CatVTONPipeline(
 )
 # AutoMasker
 mask_processor = VaeImageProcessor(vae_scale_factor=8, do_normalize=False, do_binarize=True, do_convert_grayscale=True)
-automasker = AutoMasker(
+automasker = AutoMaskerSeg(
     densepose_ckpt=os.path.join(repo_path, "DensePose"),
-    schp_ckpt=os.path.join(repo_path, "SCHP"),
+    segformer_ckpt="/home/chongzheng_p23/data/Projects/CatVTON-main/Models/segformer_b3_clothes",
     device='cuda', 
 )
 
@@ -227,6 +227,9 @@ HEADER = """
   <a href="http://120.76.142.206:8888" style="margin: 0 2px;">
     <img src='https://img.shields.io/badge/Demo-Gradio-gold?style=flat&logo=Gradio&logoColor=red' alt='Demo'>
   </a>
+  <a href="https://huggingface.co/spaces/zhengchong/CatVTON" style="margin: 0 2px;">
+    <img src='https://img.shields.io/badge/Space-ZeroGPU-orange?style=flat&logo=Gradio&logoColor=red' alt='Demo'>
+  </a>
   <a href='https://zheng-chong.github.io/CatVTON/' style="margin: 0 2px;">
     <img src='https://img.shields.io/badge/Webpage-Project-silver?style=flat&logo=&logoColor=orange' alt='webpage'>
   </a>
@@ -234,6 +237,13 @@ HEADER = """
     <img src='https://img.shields.io/badge/License-CC BY--NC--SA--4.0-lightgreen?style=flat&logo=Lisence' alt='License'>
   </a>
 </div>
+<br>
+
+· Thanks to <a href="https://huggingface.co/zero-gpu-explorers">ZeroGPU</a>  for providing A100 for this demo. <br> 
+· To adapt to ZeroGPU, we replace SCHP with <a href="https://huggingface.co/mattmdjaga/segformer_b2_clothes">SegFormer</a> which may result in differences from <a href="http://120.76.142.206:8888">our own demo</a>. <br>
+· This demo and our weights are only open for **Non-commercial Use**. <br>
+· SafetyChecker is set to filter NSFW content, but it may block normal results too. Please adjust the <span>`seed`</span> for normal outcomes.
+
 """
 
 def app_gradio():
