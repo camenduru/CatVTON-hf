@@ -14,3 +14,4 @@ masker = AutoMaskerSeg(
 
 result = masker(image)['mask']
 result.save("b.png")
+
