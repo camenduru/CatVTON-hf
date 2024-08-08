@@ -6,8 +6,8 @@ import cv2
 from diffusers.image_processor import VaeImageProcessor
 import torch
 
-from model.DensePose import DensePose
-from model.segformer_b2 import Segformer  # type: ignore
+from model.SCHP import SCHP  # type: ignore
+from model.DensePose import DensePose  # type: ignore
 
 DENSE_INDEX_MAP = {
     "background": [0],
@@ -152,37 +152,43 @@ def hull_mask(mask_area: np.ndarray):
     return hull_mask
     
 
-class AutoMaskerSeg:
+class AutoMasker:
     def __init__(
         self, 
         densepose_ckpt='./Models/DensePose', 
-        segformer_ckpt='./Models/segformer_b3_clothes',
+        schp_ckpt='./Models/SCHP', 
         device='cuda'):
         np.random.seed(0)
         torch.manual_seed(0)
         torch.cuda.manual_seed(0)
         
         self.densepose_processor = DensePose(densepose_ckpt, device)
-        self.segformer_processor = Segformer(segformer_ckpt, device)
+        self.schp_processor_atr = SCHP(ckpt_path=os.path.join(schp_ckpt, 'exp-schp-201908301523-atr.pth'), device=device)
+        self.schp_processor_lip = SCHP(ckpt_path=os.path.join(schp_ckpt, 'exp-schp-201908261155-lip.pth'), device=device)
         
         self.mask_processor = VaeImageProcessor(vae_scale_factor=8, do_normalize=False, do_binarize=True, do_convert_grayscale=True)
 
     def process_densepose(self, image_or_path):
         return self.densepose_processor(image_or_path, resize=1024)
 
-    def process_atr(self, image_or_path):
-        return self.segformer_processor(image_or_path)
+    def process_schp_lip(self, image_or_path):
+        return self.schp_processor_lip(image_or_path)
+
+    def process_schp_atr(self, image_or_path):
+        return self.schp_processor_atr(image_or_path)
         
     def preprocess_image(self, image_or_path):
         return {
             'densepose': self.densepose_processor(image_or_path, resize=1024),
-            'atr': self.process_atr(image_or_path),
+            'schp_atr': self.schp_processor_atr(image_or_path),
+            'schp_lip': self.schp_processor_lip(image_or_path)
         }
     
     @staticmethod
     def cloth_agnostic_mask(
         densepose_mask: Image.Image,
-        atr_mask: Image.Image,
+        schp_lip_mask: Image.Image,
+        schp_atr_mask: Image.Image,
         part: str='overall',
         **kwargs
     ):
@@ -197,30 +203,33 @@ class AutoMaskerSeg:
         kernal_size = kernal_size if kernal_size % 2 == 1 else kernal_size + 1
         
         densepose_mask = np.array(densepose_mask)
-        # schp_lip_mask = np.array(schp_lip_mask)
-        atr_mask = np.array(atr_mask)
+        schp_lip_mask = np.array(schp_lip_mask)
+        schp_atr_mask = np.array(schp_atr_mask)
         
         # Strong Protect Area (Hands, Face, Accessory, Feet)
         hands_protect_area = part_mask_of(['hands', 'feet'], densepose_mask, DENSE_INDEX_MAP)
         hands_protect_area = cv2.dilate(hands_protect_area, dilate_kernel, iterations=1)
-        hands_protect_area = hands_protect_area & (part_mask_of(['Left-arm', 'Right-arm', 'Left-leg', 'Right-leg'], atr_mask, ATR_MAPPING)) 
-            #  | part_mask_of(['Left-arm', 'Right-arm', 'Left-leg', 'Right-leg'], schp_lip_mask, LIP_MAPPING))
-        face_protect_area = part_mask_of('face', densepose_mask, DENSE_INDEX_MAP) & part_mask_of('Face', atr_mask, ATR_MAPPING)
+        hands_protect_area = hands_protect_area & \
+            (part_mask_of(['Left-arm', 'Right-arm', 'Left-leg', 'Right-leg'], schp_atr_mask, ATR_MAPPING) | \
+             part_mask_of(['Left-arm', 'Right-arm', 'Left-leg', 'Right-leg'], schp_lip_mask, LIP_MAPPING))
+        face_protect_area = part_mask_of('Face', schp_lip_mask, LIP_MAPPING)
 
         strong_protect_area = hands_protect_area | face_protect_area 
 
         # Weak Protect Area (Hair, Irrelevant Clothes, Body Parts)
-        body_protect_area = part_mask_of(PROTECT_BODY_PARTS[part], atr_mask, ATR_MAPPING) # part_mask_of(PROTECT_BODY_PARTS[part], schp_lip_mask, LIP_MAPPING) | 
-        hair_protect_area = part_mask_of(['Hair'], atr_mask, ATR_MAPPING)#part_mask_of(['Hair'], schp_lip_mask, LIP_MAPPING) | \
-            
-        cloth_protect_area = part_mask_of(PROTECT_CLOTH_PARTS[part]['ATR'], atr_mask, ATR_MAPPING) #part_mask_of(PROTECT_CLOTH_PARTS[part]['LIP'], schp_lip_mask, LIP_MAPPING) | \
-            
-        accessory_protect_area = part_mask_of((accessory_parts := ['Hat', 'Glove', 'Sunglasses', 'Bag', 'Left-shoe', 'Right-shoe', 'Scarf', 'Socks']), atr_mask, ATR_MAPPING) 
+        body_protect_area = part_mask_of(PROTECT_BODY_PARTS[part], schp_lip_mask, LIP_MAPPING) | part_mask_of(PROTECT_BODY_PARTS[part], schp_atr_mask, ATR_MAPPING)
+        hair_protect_area = part_mask_of(['Hair'], schp_lip_mask, LIP_MAPPING) | \
+            part_mask_of(['Hair'], schp_atr_mask, ATR_MAPPING)
+        cloth_protect_area = part_mask_of(PROTECT_CLOTH_PARTS[part]['LIP'], schp_lip_mask, LIP_MAPPING) | \
+            part_mask_of(PROTECT_CLOTH_PARTS[part]['ATR'], schp_atr_mask, ATR_MAPPING)
+        accessory_protect_area = part_mask_of((accessory_parts := ['Hat', 'Glove', 'Sunglasses', 'Bag', 'Left-shoe', 'Right-shoe', 'Scarf', 'Socks']), schp_lip_mask, LIP_MAPPING) | \
+            part_mask_of(accessory_parts, schp_atr_mask, ATR_MAPPING) 
         weak_protect_area = body_protect_area | cloth_protect_area | hair_protect_area | strong_protect_area | accessory_protect_area
         
         # Mask Area
-        strong_mask_area = part_mask_of(MASK_CLOTH_PARTS[part], atr_mask, ATR_MAPPING)
-        background_area = part_mask_of(['Background'], atr_mask, ATR_MAPPING)
+        strong_mask_area = part_mask_of(MASK_CLOTH_PARTS[part], schp_lip_mask, LIP_MAPPING) | \
+            part_mask_of(MASK_CLOTH_PARTS[part], schp_atr_mask, ATR_MAPPING)
+        background_area = part_mask_of(['Background'], schp_lip_mask, LIP_MAPPING) & part_mask_of(['Background'], schp_atr_mask, ATR_MAPPING)
         mask_dense_area = part_mask_of(MASK_DENSE_PARTS[part], densepose_mask, DENSE_INDEX_MAP)
         mask_dense_area = cv2.resize(mask_dense_area.astype(np.uint8), None, fx=0.25, fy=0.25, interpolation=cv2.INTER_NEAREST)
         mask_dense_area = cv2.dilate(mask_dense_area, dilate_kernel, iterations=2)
@@ -248,17 +257,15 @@ class AutoMaskerSeg:
         preprocess_results = self.preprocess_image(image)
         mask = self.cloth_agnostic_mask(
             preprocess_results['densepose'], 
-            preprocess_results['atr'],
-            # preprocess_results['schp_lip'], 
-            # preprocess_results['schp_atr'], 
+            preprocess_results['schp_lip'], 
+            preprocess_results['schp_atr'], 
             part=mask_type,
         )
         return {
             'mask': mask,
             'densepose': preprocess_results['densepose'],
-            'atr': preprocess_results['atr'],
-            # 'schp_lip': preprocess_results['schp_lip'],
-            # 'schp_atr': preprocess_results['schp_atr']
+            'schp_lip': preprocess_results['schp_lip'],
+            'schp_atr': preprocess_results['schp_atr']
         }
 
 

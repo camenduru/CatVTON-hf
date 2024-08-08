@@ -1,10 +1,7 @@
 import argparse
 import os
-os.environ['CUDA_HOME'] = '/usr/local/cuda'
-os.environ['PATH'] = os.environ['PATH'] + ':/usr/local/cuda/bin'
-
 from datetime import datetime
-import spaces
+
 import gradio as gr
 import numpy as np
 import torch
@@ -12,7 +9,7 @@ from diffusers.image_processor import VaeImageProcessor
 from huggingface_hub import snapshot_download
 from PIL import Image
 
-from model.cloth_masker import AutoMaskerSeg, vis_mask
+from model.cloth_masker import AutoMasker, vis_mask
 from model.pipeline import CatVTONPipeline
 from utils import init_weight_dtype, resize_and_crop, resize_and_padding
 
@@ -85,12 +82,6 @@ def parse_args():
             " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."
         ),
     )
-    # parser.add_argument(
-    #     "--enable_condition_noise",
-    #     action="store_true",
-    #     default=True,
-    #     help="Whether or not to enable condition noise.",
-    # )
     
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -123,13 +114,13 @@ pipeline = CatVTONPipeline(
 )
 # AutoMasker
 mask_processor = VaeImageProcessor(vae_scale_factor=8, do_normalize=False, do_binarize=True, do_convert_grayscale=True)
-automasker = AutoMaskerSeg(
+automasker = AutoMasker(
     densepose_ckpt=os.path.join(repo_path, "DensePose"),
-    segformer_ckpt="mattmdjaga/segformer_b2_clothes",
+    schp_ckpt=os.path.join(repo_path, "SCHP"),
     device='cuda', 
 )
 
-@spaces.GPU
+
 def submit_function(
     person_image,
     cloth_image,
@@ -238,12 +229,9 @@ HEADER = """
   </a>
 </div>
 <br>
-
-· Thanks to <a href="https://huggingface.co/zero-gpu-explorers">ZeroGPU</a>  for providing A100 for this demo. <br> 
-· To adapt to ZeroGPU, we replace SCHP with <a href="https://huggingface.co/mattmdjaga/segformer_b2_clothes">SegFormer</a> which may result in differences from <a href="http://120.76.142.206:8888">our own demo</a>. <br>
 · This demo and our weights are only open for **Non-commercial Use**. <br>
-· SafetyChecker is set to filter NSFW content, but it may block normal results too. Please adjust the <span>`seed`</span> for normal outcomes.
-
+· SafetyChecker is set to filter NSFW content, but it may block normal results too. Please adjust the <span>`seed`</span> for normal outcomes.<br> 
+· Thanks to <a href="https://huggingface.co/zero-gpu-explorers">ZeroGPU</a> for providing GPU for <a href="https://huggingface.co/spaces/zhengchong/CatVTON">Our HuggingFace Space.</a> 
 """
 
 def app_gradio():
