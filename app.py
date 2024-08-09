@@ -5,6 +5,7 @@ os.environ['PATH'] = os.environ['PATH'] + ':/usr/local/cuda/bin'
 from datetime import datetime
 
 import gradio as gr
+import spaces
 import numpy as np
 import torch
 from diffusers.image_processor import VaeImageProcessor
@@ -122,7 +123,7 @@ automasker = AutoMasker(
     device='cuda', 
 )
 
-
+@spaces.GPU
 def submit_function(
     person_image,
     cloth_image,
