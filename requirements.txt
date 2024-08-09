@@ -18,5 +18,4 @@ cloudpickle==3.0.0
 omegaconf==2.3.0
 pycocotools==2.0.8
 av==12.3.0
-inplace-abn==1.1.0
 gradio==4.41.0
