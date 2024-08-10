@@ -123,7 +123,7 @@ automasker = AutoMasker(
     device='cuda', 
 )
 
-@spaces.GPU
+@spaces.GPU(duration=120)
 def submit_function(
     person_image,
     cloth_image,
