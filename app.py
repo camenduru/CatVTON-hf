@@ -11,7 +11,7 @@ import torch
 from diffusers.image_processor import VaeImageProcessor
 from huggingface_hub import snapshot_download
 from PIL import Image
-
+torch.jit.script = lambda f: f
 from model.cloth_masker import AutoMasker, vis_mask
 from model.pipeline import CatVTONPipeline
 from utils import init_weight_dtype, resize_and_crop, resize_and_padding
