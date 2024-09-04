@@ -583,7 +583,6 @@ def is_xformers_available():
         )
 
 
-
 def resize_and_crop(image, size):
     # Crop to size ratio
     w, h = image.size
@@ -621,49 +620,4 @@ def resize_and_padding(image, size):
 
 
 if __name__ == "__main__":
-    import torch
-    import torch.nn.functional as F
-    from torchvision import transforms
-    from PIL import Image, ImageFilter
-    import numpy as np
-
-    def vis_sobel_weight(image_path, mask_path) -> PIL.Image.Image:
-
-        image = Image.open(image_path).convert("RGB")
-        w, h = image.size
-        l_w, l_h = w // 8, h // 8
-        image = image.resize((l_w, l_h))
-        mask = Image.open(mask_path).convert("L").resize((l_w, l_h))
-        image_pt = transforms.ToTensor()(image).unsqueeze(0).to("cuda")
-        mask_pt = transforms.ToTensor()(mask).unsqueeze(0).to("cuda")
-        sobel_pt = sobel(image_pt, mask_pt, scale=1.0)
-        sobel_image = sobel_pt.squeeze().cpu().numpy()
-        sobel_image = Image.fromarray((sobel_image * 255).astype(np.uint8))
-        sobel_image = sobel_image.resize((w, h), resample=Image.NEAREST)
-        # 图像平滑
-        sobel_image = sobel_image.filter(ImageFilter.SMOOTH)
-        from data.utils import grayscale_to_heatmap
-
-        sobel_image = grayscale_to_heatmap(sobel_image)
-        image = Image.open(image_path).convert("RGB").resize((w, h))
-        sobel_image = Image.blend(image, sobel_image, alpha=0.5)
-        return sobel_image
-
-    save_folder = "./sobel_vis-2.0"
-    if not os.path.exists(save_folder):
-        os.makedirs(save_folder)
-    from data.utils import scan_files_in_dir
-
-    for i in scan_files_in_dir(
-        "/home/chongzheng/Projects/try-on-project/Datasets/VITONHD-1024/test/Images"
-    ):
-        image_path = i.path
-
-        if i.path.endswith("-1.jpg"):
-            result_path = os.path.join(save_folder, os.path.basename(image_path))
-
-            mask_path = image_path.replace("Images", "AgnosticMask").replace(
-                "-1.jpg", "_mask-1.png"
-            )
-            vis_sobel_weight(image_path, mask_path).save(result_path)
     pass
